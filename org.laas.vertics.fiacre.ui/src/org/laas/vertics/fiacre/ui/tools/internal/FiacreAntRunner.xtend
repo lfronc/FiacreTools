@@ -1,4 +1,4 @@
-package org.laas.vertics.fiacre.tools.internal
+package org.laas.vertics.fiacre.ui.tools.internal
 
 import java.io.BufferedReader
 import java.io.File

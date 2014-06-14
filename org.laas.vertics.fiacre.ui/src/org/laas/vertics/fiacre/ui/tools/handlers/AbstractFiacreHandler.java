@@ -1,4 +1,4 @@
-package org.laas.vertics.fiacre.tools.handlers;
+package org.laas.vertics.fiacre.ui.tools.handlers;
 
 import org.eclipse.core.commands.AbstractHandler;
 import org.eclipse.core.resources.IFile;

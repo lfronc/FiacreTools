@@ -1,4 +1,4 @@
-package org.laas.vertics.fiacre.tools.handlers;
+package org.laas.vertics.fiacre.ui.tools.handlers;
 
 import org.eclipse.core.commands.ExecutionEvent;
 import org.eclipse.core.commands.ExecutionException;
@@ -9,11 +9,10 @@ import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.PlatformUI;
-import org.laas.vertics.fiacre.tools.internal.FiacreAntRunner;
+import org.laas.vertics.fiacre.ui.tools.internal.FiacreAntRunner;
 
 public class CallTinaHandler extends AbstractFiacreHandler {
 
-	@Override
 	public Object execute(ExecutionEvent event) throws ExecutionException {
 		final IWorkbench workbench = PlatformUI.getWorkbench();
 		final IFile file = getCurrentFile(workbench);
