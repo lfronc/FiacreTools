@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<project name="fiacreEditor" default="callTina">
+	<description>
+		arg1 = ${dirTinaPath} : tina executable folder
+		arg2 = ${dirFracPath} : frac executable folder
+		arg3 = ${dirWorkspace} : current project folder
+		arg4 = ${fracFileName} : frc file name without extension
+	</description>
+
+	<property name="dirTina" value="${dirTinaPath}" />	
+	<property name="dirFrac" value="${dirFracPath}" />
+	<property name="workspace" value="${dirWorkspace}" />
+	<property name="fileName" value="${fracFileName}" />
+	
+	<property name="pathFile" value="${workspace}/${fileName}" />
+	<property name="results" value="${workspace}/${fracFileName}_compilation_results"/>
+	<property name="tina" value="${dirTina}/tina" />
+	<property name="frac" value="${dirFrac}/frac" />
+	
+	<target name="init">
+		<description>
+			Create the directory to insert the compilation results.
+		</description>
+		<mkdir dir="${results}"/>
+	</target>
+	
+	<target name="compilationFiacre" depends="init">
+		<description>
+			frac filename.fcr filename.tts
+		</description>
+		<exec executable="${frac}" resultproperty="${fracFileName}_frac_result">
+			<arg value="${pathFile}.fcr"/>
+			<arg value="${pathFile}.tts"/>
+			<redirector outputproperty="frac_result.out">
+				<outputmapper type="merge" to="${results}/${fracFileName}_frac_result.out" />
+			</redirector>
+		</exec>
+	</target>
+	
+	<target name="archFiacre" depends="compilationFiacre">
+		<description>
+			frac x.fcr x.tts -arch
+		</description>
+		<exec executable="${frac}" resultproperty="${fracFileName}_arch_result">
+			<arg value="${pathFile}.fcr"/>
+			<arg value="${pathFile}.tts"/>
+			<arg value="-arch"/>
+			<redirector outputproperty="arch_result.out">
+				<outputmapper type="merge" to="${results}/${fracFileName}_arch_result.out" />
+			</redirector>
+		</exec>
+	</target>
+
+	<target name="gFiacre" depends="archFiacre">
+		<description>
+			frac -G x.fcr x.txt
+		</description>
+		<exec executable="${frac}" resultproperty="g_result">
+			<arg value="-G"/>
+			<arg value="${pathFile}.fcr"/>
+			<arg value="${results}/${fracFileName}_g_result.out"/>
+		</exec>
+	</target>
+
+	<target name="callMake" depends="gFiacre">
+		<description>
+			make -f Makefile LIBHOME=libfrac NAME=filename filename
+		</description>
+		<exec executable="make" dir="${workspace}" resultproperty="${fracFileName}_make_result">			
+			<arg value="-f"/>
+			<arg value="${dirFrac}/Makefile"/>
+			<arg value="LIBHOME=${dirFrac}/lib"/>
+			<arg value="NAME=${fileName}"/>
+			<arg value="${fileName}"/>
+			<redirector outputproperty="${fracFileName}_make_result.out">
+				<outputmapper type="merge" to="${results}/${fracFileName}_make_result.out" />
+			</redirector>
+		</exec>	
+	</target>
+
+	<target name="callTina" depends="callMake">
+		<description>
+			tina -ktz filename.tts filename.ktz
+		</description>
+		<exec executable="${tina}" resultproperty="${fracFileName}_tina_result">
+			<arg value="-ktz"/>
+			<arg value="${pathFile}.tts"/>
+			<arg value="${pathFile}.ktz"/>
+			<redirector outputproperty="${fracFileName}_tina_result.out">
+				<outputmapper type="merge" to="${results}/${fracFileName}_tina_result.out"/>
+			</redirector>
+		</exec>
+	</target>
+	
+</project>

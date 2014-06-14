@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<project name="fiacreEditor" default="callSelt">
+	<description>
+		arg1 = ${dirTinaPath} : tina executable folder
+		arg2 = ${dirWorkspace} : current project folder
+		arg3 = ${fracFileName} : frc file name without extension, that is, 
+		the same ltl file name without extension		
+	</description>
+	
+	<property name="dirTina" value="${dirTinaPath}" />	
+	<property name="workspace" value="${dirWorkspace}" />
+	<property name="fileName" value="${fracFileName}" />
+	
+	<property name="pathFile" value="${workspace}/${fileName}" />
+	<property name="results" value="${workspace}/${fracFileName}_verification_results"/>
+	<property name="selt" value="${dirTina}/selt" />
+	
+	<target name="init">
+		<description>
+			Create the directory to insert the verification results.
+		</description>
+		<mkdir dir="${results}"/>
+	</target>
+	
+	<target name="callSelt" depends="init">
+		<description>
+			selt filename.ktz filename.ltl -v -p -b -q -s
+		</description>
+		<exec executable="${selt}" resultproperty="${fracFileName}_selt_result">
+			<arg value="${pathFile}.ktz"/>
+			<arg value="${pathFile}.ltl"/>
+			<arg value="-vv"/>
+			<arg value="-p"/>
+			<arg value="-q"/>
+			<redirector outputproperty="${fracFileName}_selt_result.out">
+				<outputmapper type="merge" to="${results}/${fracFileName}_selt_result.out"/>
+			</redirector>
+		</exec>
+	</target>
+	
+</project>

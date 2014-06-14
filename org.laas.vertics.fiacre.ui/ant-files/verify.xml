@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<project name="fiacreEditor" default="callSelt">
+	<description>
+			arg1 = ${dirTinaPath} : tina executable folder
+			arg2 = ${dirWorkspace} : current project folder
+			arg3 = ${fracFileName} : frc file name without extension
+			arg4 = ${strFormula} : formula that will be verified
+	</description>
+				
+	<property name="dirTina" value="${dirTinaPath}"/>	
+	<property name="workspace" value="${dirWorkspace}"/>
+	<property name="fileName" value="${fracFileName}"/>
+	<property name="formula" value="${strFormula}"/>
+	
+	<property name="pathFile" value="${workspace}/${fileName}"/>
+	<property name="results" value="${workspace}/${fileName}_verification_results"/>
+	<property name="selt" value="${dirTina}/selt"/>
+	
+	<target name="init">
+		<description>
+			Create the directory to insert the verification results.
+		</description>
+		<mkdir dir="${results}"/>
+	</target>
+	<!--	
+	<target name="writeProperty">
+		<description>
+			Writes property name.
+		</description>
+		<echo output="${results}/${fracFileName}_selt_result.out"
+			message="${formula}:
+			"/>
+	</target>
+	-->	
+	<target name="callSelt" depends="init">
+		<description>
+			selt filename.ktz -f formula -v -p -b -q -s
+		</description>
+		<exec executable="${selt}" resultproperty="${fracFileName}_view_selt_result">
+			<arg value="${pathFile}.ktz"/>
+			<arg value="-f"/>
+			<arg value="${formula}"/>
+			<arg value="-v"/>
+			<arg value="-p"/>
+			<arg value="-b"/>
+			<arg value="-q"/>
+			<arg value="-s"/>
+			<redirector outputproperty="${fracFileName}_view_selt_result.out">
+				<outputmapper type="merge" to="${results}/${fracFileName}_view_selt_result.out"/>
+			</redirector>
+		</exec>
+	</target>
+	
+</project>

@@ -1,0 +1,582 @@
+grammar org.laas.vertics.fiacre.Lang with org.eclipse.xtext.common.Terminals
+
+generate lang "http://www.laas.org/vertics/fiacre/Lang"
+
+Lang :
+	(decl += Declarations)*;
+
+Declarations:
+       {Main} ident=[ComposableID]
+     | TypeDecl
+     | ChannelDecl	
+     | ConstDecl
+     | functionDecl
+     | externDecl		    
+     | ProcessDecl	
+     | ComponentDecl		
+     //| propertyDecl Declarations		
+     | AssertDecl
+     ;
+
+ChannelDecl: CHANNEL ID IS ChannelKind;
+ConstDecl:   CONST name=ID COLON type=TypeDef IS exp=Expr;
+
+AssertDecl: 
+	   ASSERT (ident=assertDeclName) (rh=assertDeclRH)?
+;
+assertDeclName:
+	ident=ID
+;
+assertDeclRH:
+      SUB TRUE (on_true=message) (SUB FALSE (on_false=message))?
+	| SUB FALSE (on_false=message) (SUB TRUE (on_true=message))?
+;
+message: STRING| ID;
+
+Constr :
+	constr=ID;
+	
+Field :
+	field=ID;
+	
+TypeDecl : TYPE name=TypeId IS type=TypeDef;
+
+TypeId:
+	name=ID
+;
+
+TypeDef returns TypeDef:
+	  {TypeBool} 		'bool'
+	| {TypeNat}  		'nat'
+	| {TypeInt}  		'int'
+	| {TypeIdRef} 		name=[TypeId]
+	| {TypeInterval} 	min=Expr '..' max=Expr
+	| {TypeArray} 		'array' exp=Expr 'of' type=TypeDef
+	| {TypeQueue} 		'queue' exp=Expr 'of' type=TypeDef
+	| TypeUnion
+	| TypeRecord
+;
+TypeUnion returns TypeDef:
+	{TypeUnion}
+	'union'
+		constr+=TypeUnionConstr	('|' constr+=TypeUnionConstr)*
+	'end' ('union')?
+;
+TypeUnionConstr:
+	(constr+=Constr ',')* constr+=Constr ('of' type=TypeDef)?
+;	
+TypeRecord  returns TypeDef:
+	{TypeRecord} 
+	'record'
+		entry+=TypeRecordEntry (COMMA entry+=TypeRecordEntry)*
+	'end' ('record')?
+;
+TypeRecordEntry:
+	(field+=Field ',')* field+=Field ':' type=TypeDef
+;
+Expr returns Expr :
+	  {UnopExpr} operator=FIRST 	operand=ComplexExpr                             
+    | {UnopExpr} operator=LENGTH 	operand=ComplexExpr                         
+    | {UnopExpr} operator=ADD 		operand=ComplexExpr                        
+    | {UnopExpr} operator=SUB 		operand=ComplexExpr                           
+    | {UnopExpr} operator=COERCE 	operand=ComplexExpr                           
+    | {UnopExpr} operator=NOT 		operand=ComplexExpr                        
+    | {UnopExpr} operator=FULL 		operand=ComplexExpr                           
+    | {UnopExpr} operator=DEQUEUE 	operand=ComplexExpr                          
+    | {UnopExpr} operator=EMPTY 	operand=ComplexExpr    
+    | ComplexExpr ({RcveExpr.left=current} RCVE then=ComplexExpr COLON els=ComplexExpr)?
+;
+InfixOp:
+	'and' | 'or' | '<' | '<=' | '=' | '<>' | '>=' | '>' |
+	'+' | '-' | '*' | '/' | '%'
+;
+ComplexExpr returns Expr:
+	PrimitiveExpr ({InfixOp.left=current} op=InfixOp right=PrimitiveExpr)*
+;
+PrimitiveExpr returns Expr:
+	  				SimpleExpr 
+	| 				LPAREN Expr RPAREN
+	| {RecordExpr} 	LBRACE fields+=vfield (COMMA fields+=vfield)* RBRACE
+    | {ListExpr} 	LBRACK subs+=Expr (COMMA subs+=Expr)* RBRACK   
+    | {QueueExpr} 	LQBRACE RQBRACE      
+    | {QueueExpr} 	LQBRACE subs+=Expr (COMMA subs+=Expr)* RQBRACE 
+;
+vfield:
+	name=ID EQ value=Expr
+;
+SimpleExpr returns Expr:
+	  {NatExpr}    value=NAT
+	| {BoolExpr}   value=bool
+	| {ConstrExpr} name=ID (=> '(' (elts+=ComplexExpr)* ')')?
+	| {Unop2Expr}  operator=ENQUEUE LPAREN operand1=Expr COMMA operand2=Expr RPAREN
+    | {Unop2Expr}  operator=APPEND LPAREN operand1=Expr COMMA operand2=Expr RPAREN           
+;
+ProcessDecl:
+	PROCESS (ident=ComposableID) (portdecls=PortDeclarations)? (vardecls=VarDeclarations)? IS 
+		(states=StatesDecl)
+		(locals=LocalVarDeclarations)?
+		(init=InitPrelude)?
+		(trans+=Transition)+
+;
+ComposableID: 
+	name=ID
+;
+
+InitPrelude:
+	INIT stmt=Statement
+;
+StatesDecl:
+	STATES (states+=StateID) (COMMA (states+=StateID))*
+;
+StateID: 
+	name=ID
+;
+PortDeclarations:            
+     LBRACK PortDecls RBRACK;                  
+
+PortDecls:
+	ports+=PortDecl (COMMA ports+=PortDecl)*
+;
+
+PortDecl:
+	port+=PortName (COMMA port+=PortName)* COLON Profile=Profile
+;
+PortName:
+	name=ID
+;
+Profile: (pin=IN)? (pout=OUT)? kind=ChannelKind
+;
+VarDeclarations:
+     LPAREN VarDecls RPAREN
+;
+VarDecls: 
+	vars+=VarDecl (COMMA vars+=VarDecl)*
+;
+
+VarDecl:
+	amps=VarAmps COLON read=READ? write=WRITE? type=TypeDef           
+;
+
+VarAmps: 
+	amps+=VarAmp (COMMA amps+=VarAmp)*
+;
+
+VarAmp:
+	(amp=AMP)? name=ID
+;
+
+LocalVarDeclarations:
+	 VAR decls=LocalVarDecls
+;
+
+LocalVarDecls: 
+     vars+=LocalVarDecl (COMMA vars+=LocalVarDecl)*
+ ;
+
+LocalVarDecl: 
+	idents=identsComma COLON type=TypeDef (init=initval)?
+;
+
+identsComma: 
+	names+=LocalVarId (COMMA names+=LocalVarId)*
+;
+
+LocalVarId:
+	name=ID
+;
+
+initval:                                        
+	ASSIGN Expr                               
+;
+
+ChannelKind: 
+		types=ChannelTypes 
+	| 	sync=SYNC
+	|   none=NONE
+;
+
+ChannelTypes : 
+	types+=TypeDef (SHARP types+=TypeDef)*
+;
+
+Transition:
+	FROM state=[StateID] statements=Statement
+;
+
+
+Statement returns Statement:
+	basics+=basic_statement (SEMICOLON basics+=basic_statement)*
+;
+
+basic_statement returns Statement:
+	  {NullStmt} NULL
+	| {LoopStmt} LOOP
+	| {TagStmt}  SHARP ID
+	| {RcveStmt} ID RCVE patterns=patterns (WHERE e=Expr)?
+	| {SendStmt} ID SEND sent=sent
+	| {WaitStmt} WAIT interval=Interval 	
+	| {OnStmt}   ON cond=Expr
+	| {SyncStmt} ID
+	| {ToStmt}   TO state=[StateID]
+	| assignment
+	| ite
+	| selectchoice
+	| whilestmt
+	| foreachstmt
+	| casestmt
+;
+Interval:
+	{Interval} left=left ',' right=right
+;
+left:
+	{IntervalLeft} (brack=LBRACK | brack=RBRACK) value=dec_or_nat
+;
+right:
+	  {IntervalRight} value=dec_or_nat 	brack=('['|']')
+	| {IntervalRight} value=INFTY 	 	brack='['
+;
+dec_or_nat:
+	  DEC
+	| NAT
+;
+litteral returns Pattern:
+	  {NatPattern} NAT
+	| {BoolPattern} value=TRUE
+	| {BoolPattern} value=FALSE
+;
+atompattern returns Pattern:
+	  litteral
+	| {AnyPattern} ANY
+	| {IDPattern}  ID
+	| LPAREN pattern RPAREN
+;
+
+compositepattern returns Pattern:
+	  {CompositePattern} pattern=atompattern (aux=composite_aux)?
+;
+composite_aux returns Pattern: 
+	  {IndexPattern} LBRACK index=Expr RBRACK (next=composite_aux)?
+	| {FieldPattern} DOT ID (next=composite_aux)?
+;
+
+pattern returns Pattern:
+	  {SignPattern} sign=SUB value=NAT
+	| {SignPattern} sign=ADD value=NAT
+	| compositepattern
+;
+
+patterns:
+	patterns+=pattern (COMMA patterns+=pattern)*
+;
+
+assignment:
+    patterns+=pattern (COMMA patterns+=pattern)* ASSIGN right=assign_rh
+; 
+
+assign_rh:
+	  {ExprAssignRH} (e+=Expr) (COMMA e+=Expr)*
+	| {AnyAssignRH}  ANY (wheree=wheree)?
+;
+
+wheree:
+	(WHERE e=Expr)
+;
+
+ite:
+	IF cond=Expr THEN thenstmt=Statement (ELSEIF eif+=Expr THEN eif_stmt+=Statement)* (ELSE els_stmt=Statement)? END (IF)?
+;
+
+selectchoice:
+	SELECT slct=Statement (ALT alts+=Statement)* (INF inf=Statement)? END (SELECT)? 
+;
+
+whilestmt:
+	WHILE wexp=Expr DO stmt=Statement END (WHILE)?
+;
+
+foreachstmt:
+	FOREACH vid=ID DO stmt=Statement END (FOREACH)?
+;
+
+sent:
+	  {ExprSent} expr=Expr (COMMA next=sent)?
+	| {AnySent}  ANY (COMMA next=sent)?
+;
+
+casestmt:
+	CASE cexp=Expr OF matches=matches END (CASE)?
+;
+
+match:
+	left=pattern ARROW right=Statement
+;
+matches:
+	matches+=match (MID matches+=match)*
+;
+
+bool:
+	TRUE | FALSE
+;
+
+functionDecl:
+	FUNCTION ID LPAREN funarguments RPAREN COLON rettype=TypeDef IS
+		vars=LocalVarDeclarations
+		body=fbody
+;
+
+funargument:
+	idenst=identsComma COLON type=TypeDef
+;
+funarguments:
+	args+=funargument (COMMA args+=funargument)*
+;
+
+fbody:
+	  RETURN Expr
+	| BEGIN fstatements END
+;
+
+fstatements returns fstatement:
+	fstmts+=fstatement (SEMICOLON fstmts+=fstatement)*
+;
+
+fstatement returns fstatement:
+	  {AssignFStmt} patterns=patterns ASSIGN right=Expr
+	| {ITEFStmt} IF cond=Expr THEN then=fstatements (=> elsifs+=felsifs)* (=> els+=felse)? END (IF)?
+	| WHILE cond=Expr DO fstatements END (WHILE)?
+	| FOREACH ID DO fstatements END (FOREACH)?
+	| CASE cas=Expr OF fmatches END (CASE)?
+	| RETURN Expr
+;
+
+felsifs returns fstatement:
+	ELSEIF cond=Expr THEN fstatement
+;
+
+felse returns fstatement:
+	ELSE fstatement
+;
+
+fmatches:
+	matches+=fmatch (MID matches+=fmatch)*
+;
+
+fmatch returns fstatement: 
+	patterns=patterns ARROW fstatements
+;
+
+externDecl:
+	EXTERN ID LPAREN (ntypes)? RPAREN COLON (rettype=TypeDef) IS ID
+;
+ntypes:
+	types+=TypeDef (COLON types+=TypeDef)*
+;
+
+
+ComponentDecl:
+	COMPONENT (ident=ComposableID) (portdecls=PortDeclarations)? (vardecls=VarDeclarations)? IS
+		(locvars=LocalVarDeclarations)?
+		(LocalPorts=LocalPortDeclarations)?
+		(proprities=priorityDeclarations)?
+		(init=InitPrelude)?
+		comp=Composition
+;
+LocalPortDeclarations:
+	PORT decls=LocalPortDecls 
+;
+LocalPortDecls:
+	ports+=LocalPortDecl (',' ports+=LocalPortDecl)*	
+;
+LocalPortDecl:
+	idents=identsComma ':' Profile=Profile (right=LocalPortDeclRH)?
+;
+LocalPortDeclRH:
+	  IN interval=Interval (IS probe=probe)?
+	| IS probe=probe
+;
+
+probe:
+	NULL // TODO
+;
+
+priorityDeclarations:
+	PRIORITY // TODO
+;
+
+Composition returns Composition:
+	{ParComposition}
+	PAR (portset=PortSet IN)?		
+			 	blocks+=CompositionBlock
+		(DBAR 	blocks+=CompositionBlock)*
+	END (PAR)?
+;
+PortSet:
+		{PortSet} ports+=ID (COMMA ports+=ID)* 
+	| 	{StarPort} '*'
+;
+Instance returns Composition:
+	{Instance} ident=([ComposableID]) (ports=portargs)? (args=arguments)?
+;
+CompositionBlock returns Composition:
+		{PortSetCompositionBlock} portset=PortSet ARROW (body=Instance | body=Composition)
+	|	Instance 
+	| 	Composition
+;
+
+portargs:
+	LBRACK args+=[LocalVarId] (COMMA args+=[LocalVarId])* RBRACK
+;
+arguments:
+	LPAREN eamps=expamps RPAREN
+;
+expamps:
+	args+=expamp (COMMA args+=expamp)*
+;
+expamp:
+	  Expr
+	| AMP Expr
+;
+ 
+
+        
+// Terminal rules
+
+// FRAC
+
+INIT : "init";
+UNION : "union";
+RECORD : "record";
+QUEUE : "queue"; 
+CONST : "const";
+FUNCTION : "function";
+EXTERN : "extern";
+PROCESS : "process";
+COMPONENT : "component";
+VAR : "var";
+FROM : "from";
+ANY : "any";
+WHERE : "where";
+IF : "if";
+OF : "of";
+THEN : "then";
+ELSE : "else";
+ELSEIF : "elsif";
+SELECT : "select";
+CASE : "case";
+END : "end";
+TO : "to";
+LOOP : "loop";
+ARRAY : "array";
+T_BOOL : "bool";
+T_NAT : "nat";
+T_INT : "int";
+TRUE : "true";
+FALSE : "false";
+FULL : "full";
+FIRST : "first";
+LENGTH : "length";
+EMPTY : "empty";
+DEQUEUE : "dequeue";
+ENQUEUE : "enqueue";
+APPEND : "append";
+NOT : "not";
+IN : "in";
+OUT : "out"; 
+NONE : name="none";
+SYNC : name="sync";
+STATES : "states";
+PRIORITY : "priority";
+PORT : "port";
+READ : "read";
+WRITE : "write";
+NULL : "null" ;
+WHILE : "while";
+FOREACH : "foreach";
+DO : "do";
+RCVE : "?";
+AND : "and";
+OR : "or";
+CHANNEL : "channel";
+TYPE : "type";
+IS : "is";
+PAR : "par";
+INFTY : "...";
+AMP : "&";
+MID : "|";
+DBAR : "||";
+ADD : "+";
+MOD : "%";
+SUB : "-";
+MUL : "*";
+SHARP : "#";
+DIV : "/";
+COERCE : "$";
+LT : "<";
+LE : "<=";
+GE : ">=";
+GT : ">";
+EQ : "=";
+NE : "<>";
+SEND : "!";
+TWODOT : "..";
+DOT : ".";
+ASSIGN : ":=" ;
+COLON : ":" ;
+COMMA : ",";
+SEMICOLON : ";";
+ALT : "[]";
+INF : "unless";
+LBRACK : "[";
+RBRACK : "]";
+LPAREN : "(";
+RPAREN : ")";
+LBRACE : "{";
+RBRACE : "}";
+LQBRACE : "{|";
+RQBRACE : "|}";
+ARROW : "->";
+ON : "on";
+WAIT : "wait";
+BEGIN : "begin";
+RETURN : "return";
+COMMENT_BEGIN : "/*";
+COMMENT_END : "*/";
+DEADLOCKFREE : "deadlockfree";
+INFINITELYOFTEN : "infinitelyoften";
+MORTAL : "mortal";
+LIVE : "live";
+PRESENT : "present";
+ABSENT : "absent";
+LEADSTO : "leadsto";
+ALWAYS : "always";
+PRECEDES : "precedes";
+WITHIN : "within";
+LASTING : "lasting";
+AFTER : "after";
+BEFORE : "before";
+BETWEEN : "between";
+UNTIL : "until";
+FOR : "for";
+PROPERTY : "property";
+ASSERT : "assert";
+LTL : "ltl";
+IMP : "=>";
+RELEASE : "release";
+NEXT : "()";
+	
+
+	
+//terminal ID : '^'?('a'..'z'|'A'..'Z'|'_') ('a'..'z'|'A'..'Z'|'_'|'0'..'9')*;
+NAT : INT; // ('0'..'9')+;
+DEC : INT DOT INT;
+
+terminal STRING	: 
+		'"' ( '\\' ('b'|'t'|'n'|'f'|'r'|'"'|"'"|'\\') | !('\\'|'"') )* '"' 
+		| "'" ( '\\' ('b'|'t'|'n'|'f'|'r'|'"'|"'"|'\\') | !('\\'|"'") )* "'"
+; 
+// terminal INTEGER returns ecore::EInt: ('0'..'9')+;
+
+//terminal SL_COMMENT : '/* */';
+terminal SL_COMMENT : '//' -> '\n';
+terminal ML_COMMENT	: '/*' -> '*/';
+terminal WS	: (' '|'\t'|'\r'|'\n')+;
