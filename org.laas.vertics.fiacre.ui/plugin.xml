@@ -414,7 +414,7 @@
       <command
             categoryId="org.laas.vertics.fiacre.tools.commands.category"
             id="org.laas.vertics.fiacre.tools.commands.calltina"
-            name="Call Tina">
+            name="Compile fiacre specification and call Tina">
       </command>
    </extension>
    <extension
@@ -456,7 +456,14 @@
                   icon="icons/compile.png"
                   id="org.laas.vertics.fiacre.tools.menus.compile"
                   mnemonic="S"
-                  tooltip="Compile Fiacre Specification">
+                  tooltip="Compile fiacre specification">
+            </command>
+            <command
+                  commandId="org.laas.vertics.fiacre.tools.commands.calltina"
+                  icon="icons/calltina.png"
+                  id="org.laas.vertics.fiacre.tools.menus.calltina"
+                  mnemonic="S"
+                  tooltip="Compile fiacre specification and call Tina">
             </command>
          </menu>
       </menuContribution>
@@ -474,7 +481,7 @@
                   commandId="org.laas.vertics.fiacre.tools.commands.calltina"
                   icon="icons/calltina.png"
                   id="org.laas.vertics.fiacre.tools.toolbars.calltinabutton"
-                  tooltip="Call Tina">
+                  tooltip="Compile fiacre specification and call Tina">
             </command>
          </toolbar>
       </menuContribution>

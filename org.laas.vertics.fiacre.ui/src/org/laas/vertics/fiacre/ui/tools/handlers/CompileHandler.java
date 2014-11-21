@@ -1,8 +1,8 @@
 package org.laas.vertics.fiacre.ui.tools.handlers;
 
+import org.eclipse.core.commands.AbstractHandler;
 import org.eclipse.core.commands.ExecutionEvent;
 import org.eclipse.core.commands.ExecutionException;
-import org.eclipse.core.resources.IFile;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
@@ -17,7 +17,7 @@ import org.laas.vertics.fiacre.ui.tools.internal.FiacreAntRunner;
  * @see org.eclipse.core.commands.IHandler
  * @see org.eclipse.core.commands.AbstractHandler
  */
-public class CompileHandler extends AbstractFiacreHandler {
+public class CompileHandler extends AbstractHandler {
 	/**
 	 * The constructor.
 	 */
@@ -30,17 +30,18 @@ public class CompileHandler extends AbstractFiacreHandler {
 	 */
 	public Object execute(ExecutionEvent event) throws ExecutionException {
 		final IWorkbench workbench = PlatformUI.getWorkbench();
-		final IFile file = getCurrentFile(workbench);
-		final FiacreAntRunner runner = new FiacreAntRunner();
-
-		Job job = new Job("Compiling " + file.getName()) {
-			@Override
-			protected IStatus run(IProgressMonitor monitor) {
-				runner.compile(workbench, file, file.getParent().getLocation().toString(), monitor);
-				return Status.OK_STATUS;				
-			}
-		};
-		job.schedule();
+		final FiacreAntRunner runner = FiacreAntRunner.MakeRunner(workbench);
+		if (runner.isReady()) {
+			Job job = new Job("Compiling...") {
+				@Override
+				protected IStatus run(IProgressMonitor monitor) {
+					runner.run(monitor,false);
+					runner.checkAndCreateMarkers();
+					return Status.OK_STATUS;
+				}
+			};
+			job.schedule();
+		}
 		return null;
 	}
 }
