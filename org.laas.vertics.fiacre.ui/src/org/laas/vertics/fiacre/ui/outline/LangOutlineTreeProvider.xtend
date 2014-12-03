@@ -10,6 +10,7 @@ import org.eclipse.emf.ecore.EObject
 import org.eclipse.xtext.ui.editor.outline.IOutlineNode
 import org.eclipse.xtext.ui.editor.outline.impl.DefaultOutlineTreeProvider
 import org.eclipse.xtext.ui.editor.outline.impl.DocumentRootNode
+import org.laas.vertics.fiacre.lang.Profile
 import org.laas.vertics.fiacre.lang.AssertDecl
 import org.laas.vertics.fiacre.lang.ChannelKind
 import org.laas.vertics.fiacre.lang.ChannelTypes
@@ -39,10 +40,11 @@ import org.laas.vertics.fiacre.lang.PortName
 import org.laas.vertics.fiacre.lang.PortSet
 import org.laas.vertics.fiacre.lang.PortSetCompositionBlock
 import org.laas.vertics.fiacre.lang.ProcessDecl
-import org.laas.vertics.fiacre.lang.Profile
+import org.laas.vertics.fiacre.lang.PropertyID
 import org.laas.vertics.fiacre.lang.SYNC
 import org.laas.vertics.fiacre.lang.StarPort
 import org.laas.vertics.fiacre.lang.StatesDecl
+import org.laas.vertics.fiacre.lang.TagStmt
 import org.laas.vertics.fiacre.lang.ToStmt
 import org.laas.vertics.fiacre.lang.Transition
 import org.laas.vertics.fiacre.lang.TypeArray
@@ -63,7 +65,14 @@ import org.laas.vertics.fiacre.lang.VarAmps
 import org.laas.vertics.fiacre.lang.VarDecl
 import org.laas.vertics.fiacre.lang.VarDecls
 import org.laas.vertics.fiacre.lang.arguments
+import org.laas.vertics.fiacre.lang.assertDeclName
+import org.laas.vertics.fiacre.lang.funargument
+import org.laas.vertics.fiacre.lang.funarguments
+import org.laas.vertics.fiacre.lang.functionDecl
+import org.laas.vertics.fiacre.lang.functionName
+import org.laas.vertics.fiacre.lang.identsComma
 import org.laas.vertics.fiacre.lang.portargs
+import org.laas.vertics.fiacre.lang.propertyDecl
 
 /**
  * Customization of the default outline structure.
@@ -73,6 +82,7 @@ import org.laas.vertics.fiacre.lang.portargs
 class LangOutlineTreeProvider extends DefaultOutlineTreeProvider {
 	
 	private HashMap<EObject, Integer> mTransNumMap = new HashMap
+	private HashMap<EObject, List<EObject>> mTransTagMap = new HashMap
 	
 	def void _createChildren(DocumentRootNode parentNode, Lang rootElement) {
 
@@ -96,14 +106,14 @@ class LangOutlineTreeProvider extends DefaultOutlineTreeProvider {
 
 	def void _createChildren(IOutlineNode parentNode, ToStmt modelElement) {
 	}
-
-	def void _createChildren(IOutlineNode parentNode, Instance modelElement) {
-	}
-
+	
 	def void _createChildren(IOutlineNode parentNode, portargs modelElement) {
 	}
 
 	def void _createChildren(IOutlineNode parentNode, arguments modelElement) {
+	}
+	
+	def void _createChildren(IOutlineNode parentNode, propertyDecl modelElement) {
 	}
 
 	def boolean _isLeaf(TypeArray d) {
@@ -117,7 +127,7 @@ class LangOutlineTreeProvider extends DefaultOutlineTreeProvider {
 	def boolean _isLeaf(AssertDecl d) {
 		return true
 	}
-
+		
 	def boolean _isLeaf(ConstDecl d) {
 		return true
 	}
@@ -153,6 +163,10 @@ class LangOutlineTreeProvider extends DefaultOutlineTreeProvider {
 	def boolean _isLeaf(portargs args) {
 		return true
 	}
+	
+	def boolean _isLeaf(propertyDecl args) {
+		return true
+	}	
 
 	def void _createNode(IOutlineNode parentNode, PortSet modelElement) {
 	}
@@ -175,14 +189,22 @@ class LangOutlineTreeProvider extends DefaultOutlineTreeProvider {
 		]
 	}
 
-	def static List<EObject> getToStmts(List<EObject> objects) {
-		var l = new LinkedList<EObject>()
+	def static List<Pair<EObject, List<EObject>>> getToStmts(List<EObject> objects) {
+			return getToStmts(objects, new LinkedList<EObject>())
+	}
+	
+	def static List<Pair<EObject, List<EObject>>> getToStmts(List<EObject> objects, List<EObject> tags) {
+		var l = new LinkedList<Pair<EObject, List<EObject>>>()
+		var new_tags = new LinkedList<EObject>()
+		new_tags.addAll(tags)
 		for (e : objects) {
 			switch e {
+				TagStmt:
+					new_tags.add(e)
 				ToStmt, LoopStmt:
-					l.add(e)
+					l.add(e -> new_tags)
 				default:
-					l.addAll(getToStmts(e.eContents))
+					l.addAll(getToStmts(e.eContents,new_tags))
 			}
 		}
 		return l
@@ -193,7 +215,7 @@ class LangOutlineTreeProvider extends DefaultOutlineTreeProvider {
 		for (trans : modelElement.trans) {
 			var toStmts = getToStmts(trans.statements.eContents)
 			for (stmt : toStmts) {			
-				mTransNumMap.put(stmt, i)				
+				mTransNumMap.put(stmt.key, i)				
 				i = i + 1;
 			}
 		}
@@ -202,16 +224,19 @@ class LangOutlineTreeProvider extends DefaultOutlineTreeProvider {
 
 	def void _createChildren(IOutlineNode parentNode, Transition modelElement) {
 		var toStmts = getToStmts(modelElement.statements.eContents)
-		toStmts.forEach [ e, i |
+		toStmts.forEach [ p, i |
+			val e    = p.key
+			val tags = p.value
+			val text = textDispatcher.invoke(e) + " (t" + mTransNumMap.get(e) + ")" + tags.map[tag|textDispatcher.invoke(tag)].join(",")			
+			mTransTagMap.put(e, tags)
 			createEObjectNode(parentNode, e, 
 							  imageDispatcher.invoke(e), 
-							  textDispatcher.invoke(e) + " (t" + mTransNumMap.get(e) + ")", 
+							  text, 
 							  isLeafDispatcher.invoke(e)
 			);
-		]
-		
+		]		
 	}
-
+		
 	def void _createChildren(IOutlineNode parentNode, PortSetCompositionBlock composition) {
 
 		// skip portset
@@ -284,9 +309,13 @@ class LangOutlineTreeProvider extends DefaultOutlineTreeProvider {
 	}
 
 	def _text(AssertDecl decl) {
-		return "assert " + decl.getIdent()
+		return "assert " + textDispatcher.invoke(decl.getIdent())
 	}
-
+	
+	def _text(assertDeclName decl) {	
+		return decl.ident;
+	}
+	
 	def Object _text(ProcessDecl decl) {
 		var ports = ""
 		var args = ""
@@ -346,7 +375,38 @@ class LangOutlineTreeProvider extends DefaultOutlineTreeProvider {
 	def _text(TypeId id) {
 		return "name : " + id.getName()
 	}
+	
+	def _text(propertyDecl decl) {
+		return "property " + textDispatcher.invoke(decl.getName()) // + " is LTL"
+	}
 
+	def _text(PropertyID id) {
+		return id.name
+	}
+	
+	def _text(functionDecl decl) {
+		return "function " + textDispatcher.invoke(decl.getName()) 
+			+ '(' 
+			+ textDispatcher.invoke(decl.args) 
+			+ ') : ' + textDispatcher.invoke(decl.rettype) 
+	}
+	
+	def _text(functionName decl) {
+		return decl.name
+	}
+	
+	def _text(funarguments args) {
+		return args.args.map[e|textDispatcher.invoke(e)].join(", ")
+	}
+	
+	def _text(funargument arg) {
+		return textDispatcher.invoke(arg.idenst) + " : " + textDispatcher.invoke(arg.type)
+	}
+	
+	def _text(identsComma idents) {
+		return idents.names.map[e|textDispatcher.invoke(e)].join(", ")
+	}
+	
 	def _text(TypeArray arr) {
 		val exp = textDispatcher.invoke(arr.getExp())
 		val typ = textDispatcher.invoke(arr.getType())
@@ -448,11 +508,15 @@ class LangOutlineTreeProvider extends DefaultOutlineTreeProvider {
 	def _text(Transition t) {
 		return "from " + t.state.name
 	}
-
+	
 	def _text(ToStmt to) {
 		return "to " + to.state.name
 	}
 
+	def _text(TagStmt tag) {
+		return "#" + tag.tagName
+	}
+	
 	def _text(VarAmp e) {
 		return (if(e.amp != null) "&" else "") + e.name
 	}

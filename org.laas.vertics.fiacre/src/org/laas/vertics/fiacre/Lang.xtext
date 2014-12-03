@@ -14,7 +14,7 @@ Declarations:
      | externDecl		    
      | ProcessDecl	
      | ComponentDecl		
-     //| propertyDecl Declarations		
+     | propertyDecl		
      | AssertDecl
      ;
 
@@ -79,22 +79,23 @@ Expr returns Expr :
     | {UnopExpr} operator=LENGTH 	operand=ComplexExpr                         
     | {UnopExpr} operator=ADD 		operand=ComplexExpr                        
     | {UnopExpr} operator=SUB 		operand=ComplexExpr                           
-    | {UnopExpr} operator=COERCE 	operand=ComplexExpr                           
-    | {UnopExpr} operator=NOT 		operand=ComplexExpr                        
+    | {UnopExpr} operator=COERCE 	operand=ComplexExpr                        
     | {UnopExpr} operator=FULL 		operand=ComplexExpr                           
     | {UnopExpr} operator=DEQUEUE 	operand=ComplexExpr                          
-    | {UnopExpr} operator=EMPTY 	operand=ComplexExpr    
+    | {UnopExpr} operator=EMPTY 	operand=ComplexExpr                         
+    
     | ComplexExpr ({RcveExpr.left=current} RCVE then=ComplexExpr COLON els=ComplexExpr)?
 ;
 InfixOp:
-	'and' | 'or' | '<' | '<=' | '=' | '<>' | '>=' | '>' |
+	'and' | 'or' | '<' | '<=' | '=' | '<>' | '>=' | '>' | '.' |
 	'+' | '-' | '*' | '/' | '%'
 ;
 ComplexExpr returns Expr:
 	PrimitiveExpr ({InfixOp.left=current} op=InfixOp right=PrimitiveExpr)*
 ;
 PrimitiveExpr returns Expr:
-	  				SimpleExpr 
+	  				SimpleExpr                     
+    | {UnopExpr}    operator=NOT operand=PrimitiveExpr      
 	| 				LPAREN Expr RPAREN
 	| {RecordExpr} 	LBRACE fields+=vfield (COMMA fields+=vfield)* RBRACE
     | {ListExpr} 	LBRACK subs+=Expr (COMMA subs+=Expr)* RBRACK   
@@ -107,7 +108,8 @@ vfield:
 SimpleExpr returns Expr:
 	  {NatExpr}    value=NAT
 	| {BoolExpr}   value=bool
-	| {ConstrExpr} name=ID (=> '(' (elts+=ComplexExpr)* ')')?
+	| {ConstrExpr} name=ID (=> '(' (elts+=ComplexExpr (COMMA elts+=ComplexExpr)*)? ')')?
+	| {SubscrExpr} name=ID (=> '[' index=Expr ']')
 	| {Unop2Expr}  operator=ENQUEUE LPAREN operand1=Expr COMMA operand2=Expr RPAREN
     | {Unop2Expr}  operator=APPEND LPAREN operand1=Expr COMMA operand2=Expr RPAREN           
 ;
@@ -211,7 +213,7 @@ Statement returns Statement:
 basic_statement returns Statement:
 	  {NullStmt} NULL
 	| {LoopStmt} LOOP
-	| {TagStmt}  SHARP ID
+	| {TagStmt}  SHARP tagName=ID
 	| {RcveStmt} ID RCVE patterns=patterns (WHERE e=Expr)?
 	| {SendStmt} ID SEND sent=sent
 	| {WaitStmt} WAIT interval=Interval 	
@@ -319,11 +321,14 @@ bool:
 ;
 
 functionDecl:
-	FUNCTION ID LPAREN funarguments RPAREN COLON rettype=TypeDef IS
-		vars=LocalVarDeclarations
+	FUNCTION name=functionName LPAREN args=funarguments RPAREN COLON rettype=TypeDef IS
+		(vars=LocalVarDeclarations)?
 		body=fbody
 ;
 
+functionName:
+	name=ID	
+;
 funargument:
 	idenst=identsComma COLON type=TypeDef
 ;
@@ -400,7 +405,11 @@ probe:
 ;
 
 priorityDeclarations:
-	PRIORITY // TODO
+	PRIORITY priorityDecl (COMMA priorityDecl)* 
+;
+
+priorityDecl:
+	ID ('|' ID)* (LT | GT) ID ('|' ID)*  	
 ;
 
 Composition returns Composition:
@@ -434,11 +443,49 @@ expamps:
 ;
 expamp:
 	  Expr
-	| AMP Expr
+	| AMP Expr	 
 ;
- 
 
-        
+
+propertyDecl:
+	"property" name=PropertyID IS LTL formula=ltlFormula
+;
+
+PropertyID:
+	name=ID
+;
+
+ltlFormula returns ltlFormula:
+	  path+=ID ("/" path+=NAT)* ("/" type=ID expr=Expr)
+	| ComplexLTL
+;
+
+ltlBinop:
+	"and" | "or" | "=>" | "until" | "release"
+;
+
+ComplexLTL returns ltlFormula:
+	SimpleLTL ({ltlBinop.left=current} op=ltlBinop right=SimpleLTL)*
+;
+
+SimpleLTL returns ltlFormula:
+	  "(" ltlFormula ")"	  
+	| "[]" SimpleLTL
+	| "<>" SimpleLTL
+	| "not" SimpleLTL
+	| name=ID	
+;
+
+/*
+ComplexLTL returns ComplexLTL:	
+	SimpleLTL ({ltlBinop.left=current} op=ltlBinop right=SimpleLTL)*
+;
+
+SimpleLTL returns ComplexLTL:
+	  "[]" ComplexLTL
+	| obsDecl
+;
+*/        
 // Terminal rules
 
 // FRAC
